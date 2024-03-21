@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/NicolasLopes7/tcp-chat/protocol"
 )
@@ -22,6 +23,19 @@ func main() {
 		fmt.Println("Error: ", err)
 		return
 	}
+
+	go func() {
+		t := time.NewTicker(1 * time.Second)
+		defer t.Stop()
+
+		for range t.C {
+			err := checkServerStatus(&conn)
+			if err != nil {
+				fmt.Print("\n\nServer is down\n")
+				cancel(&conn, signalChan)
+			}
+		}
+	}()
 
 	fmt.Println("Enter your name: ")
 	scanner.Scan()
@@ -46,10 +60,7 @@ func main() {
 	for {
 		select {
 		case <-signalChan:
-			conn.Write(protocol.NewMessage(protocol.Logout, "disconnect").ToBytes())
-			close(signalChan)
-			conn.Close()
-			os.Exit(0)
+			cancel(&conn, signalChan)
 		case line := <-inputChan:
 			_, err = conn.Write(protocol.NewMessage(protocol.SendMessage, line).ToBytes())
 			if err != nil {
@@ -58,4 +69,19 @@ func main() {
 			}
 		}
 	}
+}
+
+func cancel(conn *net.Conn, signalChan chan os.Signal) {
+	(*conn).Write(protocol.NewMessage(protocol.Logout, "disconnect").ToBytes())
+	close(signalChan)
+	(*conn).Close()
+	os.Exit(0)
+}
+func checkServerStatus(conn *net.Conn) error {
+	_, err := (*conn).Write(protocol.NewMessage(protocol.Ping, "").ToBytes())
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
