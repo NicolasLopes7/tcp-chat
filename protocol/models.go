@@ -11,6 +11,7 @@ const (
 	SetName = iota
 	SendMessage
 	Logout
+	Ping
 )
 
 type Message struct {
