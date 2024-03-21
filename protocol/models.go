@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 )
 
 type MessageType uint8
@@ -12,6 +13,7 @@ const (
 	SendMessage
 	Logout
 	Ping
+	Die
 )
 
 type Message struct {
@@ -39,4 +41,15 @@ func ParseMessage(b []byte) *Message {
 	json.Unmarshal(b, &m)
 
 	return m
+}
+
+func ReadMessage(conn *net.Conn) (*Message, error) {
+	buffer := make([]byte, 1024)
+	n, err := (*conn).Read(buffer)
+	if err != nil {
+		return nil, err
+	}
+
+	message := ParseMessage(buffer[:n])
+	return message, nil
 }
