@@ -37,6 +37,21 @@ func main() {
 		}
 	}()
 
+	go func() {
+		for {
+			message, err := protocol.ReadMessage(&conn)
+			if err != nil {
+				fmt.Println("Error reading message:", err)
+				return
+			}
+			if message.Type == protocol.Die {
+				fmt.Println(message.Payload)
+				cancel(&conn, signalChan)
+				return
+			}
+		}
+	}()
+
 	fmt.Println("Enter your name: ")
 	scanner.Scan()
 	name := scanner.Text()
@@ -77,6 +92,7 @@ func cancel(conn *net.Conn, signalChan chan os.Signal) {
 	(*conn).Close()
 	os.Exit(0)
 }
+
 func checkServerStatus(conn *net.Conn) error {
 	_, err := (*conn).Write(protocol.NewMessage(protocol.Ping, "").ToBytes())
 	if err != nil {

@@ -1,33 +1,40 @@
 package state
 
-import "sync"
+import (
+	"net"
+	"sync"
+)
 
+type Client struct {
+	Conn *net.Conn
+	Name string
+}
 type ClientStore struct {
-	clients map[string]string
+	Clients map[string]*Client
 	mutex   sync.RWMutex
 }
 
 func NewClientStore() *ClientStore {
 	return &ClientStore{
-		clients: make(map[string]string),
+		Clients: make(map[string]*Client),
 	}
 }
 
-func (cs *ClientStore) Add(key string, value string) {
+func (cs *ClientStore) Add(key string, value *Client) {
 	cs.mutex.Lock()
 	defer cs.mutex.Unlock()
-	cs.clients[key] = value
+	cs.Clients[key] = value
 }
 
 func (cs *ClientStore) Delete(key string) {
 	cs.mutex.Lock()
 	defer cs.mutex.Unlock()
-	delete(cs.clients, key)
+	delete(cs.Clients, key)
 }
 
-func (cs *ClientStore) Get(key string) (string, bool) {
+func (cs *ClientStore) Get(key string) (*Client, bool) {
 	cs.mutex.RLock()
 	defer cs.mutex.RUnlock()
-	val, ok := cs.clients[key]
+	val, ok := cs.Clients[key]
 	return val, ok
 }
