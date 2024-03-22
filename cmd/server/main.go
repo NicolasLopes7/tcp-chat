@@ -110,6 +110,16 @@ func (s *Server) Handle(conn net.Conn) {
 			fmt.Printf("%s disconnected\n", conn.RemoteAddr().String())
 			s.clients.Delete(conn.RemoteAddr().String())
 			return
+
+		case protocol.KickUser:
+			for addr, client := range s.clients.Clients {
+				if client.Name == m.Payload {
+					fmt.Printf("Kicking %s\n", addr)
+					(*client.Conn).Write(protocol.NewMessage(protocol.Die, "You were kicked").ToBytes())
+					(*client.Conn).Close()
+					s.clients.Delete(addr)
+				}
+			}
 		}
 	}
 }
