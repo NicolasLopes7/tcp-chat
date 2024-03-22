@@ -54,6 +54,8 @@ func main() {
 		os.Exit(0)
 	}()
 
+	fmt.Println("🚀 Server started. Listening connections on port 8080")
+
 	for {
 		conn, err := server.listener.Accept()
 		if err != nil {
