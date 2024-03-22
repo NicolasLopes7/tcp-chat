@@ -14,6 +14,7 @@ const (
 	Logout
 	Ping
 	Die
+	ListUsers
 )
 
 type Message struct {
