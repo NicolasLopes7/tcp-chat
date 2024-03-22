@@ -65,9 +65,9 @@ func main() {
 	inputChan := make(chan string)
 
 	go func() {
-		fmt.Printf(">: ")
+		fmt.Printf("%s >: ", time.Now().Format(time.Kitchen))
 		for scanner.Scan() {
-			fmt.Printf(">: ")
+			fmt.Printf("%s >: ", time.Now().Format(time.Kitchen))
 			inputChan <- scanner.Text()
 		}
 	}()
