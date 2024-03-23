@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -77,12 +78,24 @@ func main() {
 		case <-signalChan:
 			cancel(&conn, signalChan)
 		case line := <-inputChan:
-			_, err = conn.Write(protocol.NewMessage(protocol.SendMessage, line).ToBytes())
+			_, err = conn.Write(GetCommandOrMessage(line).ToBytes())
 			if err != nil {
 				fmt.Println(err)
 				return
 			}
 		}
+	}
+}
+
+func GetCommandOrMessage(line string) *protocol.Message {
+	parts := strings.Split(line, " ")
+	command := parts[0]
+
+	switch command {
+	case "/list":
+		return protocol.NewMessage(protocol.ListUsers, "")
+	default:
+		return protocol.NewMessage(protocol.SendMessage, line)
 	}
 }
 
