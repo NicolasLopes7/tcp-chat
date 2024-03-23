@@ -16,6 +16,8 @@ const (
 	Die
 	ListUsers
 	KickUser
+	SubscribeToRoom
+	UnsubscribeToRoom
 )
 
 type Message struct {
