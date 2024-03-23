@@ -14,7 +14,7 @@ import (
 
 type Server struct {
 	listener net.Listener
-	clients  *state.ClientStore
+	cache    *state.UserCache
 	mutex    sync.RWMutex
 	shutdown bool
 }
@@ -29,11 +29,11 @@ func main() {
 		return
 	}
 
-	clientStore := state.NewClientStore()
+	userCache := state.NewUserCache()
 
 	server := &Server{
 		listener: listener,
-		clients:  clientStore,
+		cache:    userCache,
 	}
 
 	go func() {
@@ -41,10 +41,10 @@ func main() {
 		fmt.Println("\nShutdown signal received. Closing all connections...")
 
 		server.mutex.Lock()
-		for addr, client := range clientStore.Clients {
+		for addr, user := range userCache.Users {
 			fmt.Printf("Closing connection with %s\n", addr)
-			(*client.Conn).Write(protocol.NewMessage(protocol.Die, "Server is shutting down").ToBytes())
-			(*client.Conn).Close()
+			(*user.Conn).Write(protocol.NewMessage(protocol.Die, "Server is shutting down").ToBytes())
+			(*user.Conn).Close()
 		}
 		server.shutdown = true
 		server.mutex.Unlock()
@@ -66,14 +66,14 @@ func main() {
 			return
 		}
 
-		server.clients.Add(conn.RemoteAddr().String(), &state.Client{Conn: &conn, Name: ""})
+		server.cache.Add(conn.RemoteAddr().String(), &state.User{Conn: &conn, Name: ""})
 		go server.Handle(conn)
 	}
 }
 
 func (s *Server) Handle(conn net.Conn) {
 	defer func() {
-		s.clients.Delete(conn.RemoteAddr().String())
+		s.cache.Delete(conn.RemoteAddr().String())
 		conn.Close()
 	}()
 
@@ -84,7 +84,7 @@ func (s *Server) Handle(conn net.Conn) {
 			if s.shutdown {
 				return
 			}
-			s.clients.Delete(conn.RemoteAddr().String())
+			s.cache.Delete(conn.RemoteAddr().String())
 			return
 		}
 
@@ -93,31 +93,31 @@ func (s *Server) Handle(conn net.Conn) {
 		switch m.Type {
 		case protocol.SetName:
 			fmt.Printf("%s connected as %s\n", conn.RemoteAddr().String(), m.Payload)
-			s.clients.Add(conn.RemoteAddr().String(), &state.Client{Conn: &conn, Name: m.Payload})
+			s.cache.Add(conn.RemoteAddr().String(), &state.User{Conn: &conn, Name: m.Payload})
 
 		case protocol.SendMessage:
-			if client, ok := s.clients.Get(conn.RemoteAddr().String()); ok {
-				fmt.Println(client.Name + ": " + m.Payload)
+			if user, ok := s.cache.Get(conn.RemoteAddr().String()); ok {
+				fmt.Println(user.Name + ": " + m.Payload)
 			}
 
 		case protocol.ListUsers:
 			fmt.Println("List of users:")
-			for addr, client := range s.clients.Clients {
-				fmt.Printf("- %s (%s)\n", client.Name, addr)
+			for addr, user := range s.cache.Users {
+				fmt.Printf("- %s (%s)\n", user.Name, addr)
 			}
 
 		case protocol.Logout:
 			fmt.Printf("%s disconnected\n", conn.RemoteAddr().String())
-			s.clients.Delete(conn.RemoteAddr().String())
+			s.cache.Delete(conn.RemoteAddr().String())
 			return
 
 		case protocol.KickUser:
-			for addr, client := range s.clients.Clients {
-				if client.Name == m.Payload {
+			for addr, user := range s.cache.Users {
+				if user.Name == m.Payload {
 					fmt.Printf("Kicking %s\n", addr)
-					(*client.Conn).Write(protocol.NewMessage(protocol.Die, "You were kicked").ToBytes())
-					(*client.Conn).Close()
-					s.clients.Delete(addr)
+					(*user.Conn).Write(protocol.NewMessage(protocol.Die, "You were kicked").ToBytes())
+					(*user.Conn).Close()
+					s.cache.Delete(addr)
 				}
 			}
 		}
