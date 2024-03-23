@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/NicolasLopes7/tcp-chat/cli"
 	"github.com/NicolasLopes7/tcp-chat/protocol"
 )
 
@@ -25,39 +26,17 @@ func main() {
 		return
 	}
 
-	go func() {
-		t := time.NewTicker(1 * time.Second)
-		defer t.Stop()
+	go withHealthCheck(&conn, signalChan)
+	go withDuplexConn(&conn, signalChan)
 
-		for range t.C {
-			err := checkServerStatus(&conn)
-			if err != nil {
-				fmt.Print("\n\nServer is down\n")
-				cancel(&conn, signalChan)
-			}
-		}
-	}()
+	name, err := cli.GetNameScreen(scanner)
 
-	go func() {
-		for {
-			message, err := protocol.ReadMessage(&conn)
-			if err != nil {
-				fmt.Println("Error reading message:", err)
-				return
-			}
-			if message.Type == protocol.Die {
-				fmt.Println(message.Payload)
-				cancel(&conn, signalChan)
-				return
-			}
-		}
-	}()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-	fmt.Println("Enter your name: ")
-	scanner.Scan()
-	name := scanner.Text()
-
-	_, err = conn.Write(protocol.NewMessage(protocol.SetName, name).ToBytes())
+	_, err = conn.Write(protocol.NewMessage(protocol.SetName, *name).ToBytes())
 	if err != nil {
 		fmt.Println("Error: ", err)
 		return
@@ -108,6 +87,32 @@ func cancel(conn *net.Conn, signalChan chan os.Signal) {
 	os.Exit(0)
 }
 
+func withDuplexConn(conn *net.Conn, c chan os.Signal) {
+	for {
+		message, err := protocol.ReadMessage(conn)
+		if err != nil {
+			fmt.Println("Error reading message:", err)
+			return
+		}
+		fmt.Println(message.Payload)
+		if message.Type == protocol.Die {
+			cancel(conn, c)
+			return
+		}
+	}
+}
+func withHealthCheck(conn *net.Conn, c chan os.Signal) {
+	t := time.NewTicker(1 * time.Second)
+	defer t.Stop()
+
+	for range t.C {
+		err := checkServerStatus(conn)
+		if err != nil {
+			fmt.Print("\n\nServer is down\n")
+			cancel(conn, c)
+		}
+	}
+}
 func checkServerStatus(conn *net.Conn) error {
 	_, err := (*conn).Write(protocol.NewMessage(protocol.Ping, "").ToBytes())
 	if err != nil {
