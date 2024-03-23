@@ -102,10 +102,9 @@ func (s *Server) Handle(conn net.Conn) {
 
 		case protocol.ListUsers:
 			fmt.Println("List of users:")
-			s.clients.Range(func(addr string, client *state.Client) bool {
-				fmt.Printf(" - %s\n", client.Name)
-				return true
-			})
+			for addr, client := range s.clients.Clients {
+				fmt.Printf("- %s (%s)\n", client.Name, addr)
+			}
 
 		case protocol.Logout:
 			fmt.Printf("%s disconnected\n", conn.RemoteAddr().String())

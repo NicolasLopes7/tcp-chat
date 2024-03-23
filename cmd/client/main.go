@@ -114,11 +114,3 @@ func checkServerStatus(conn *net.Conn) error {
 
 	return nil
 }
-
-func ListUsers(conn *net.Conn) {
-	_, err := (*conn).Write(protocol.NewMessage(protocol.ListUsers, "").ToBytes())
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-}
