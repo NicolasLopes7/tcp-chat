@@ -94,6 +94,8 @@ func GetCommandOrMessage(line string) *protocol.Message {
 	switch command {
 	case "/list":
 		return protocol.NewMessage(protocol.ListUsers, "")
+	case "/kick":
+		return protocol.NewMessage(protocol.KickUser, parts[1])
 	default:
 		return protocol.NewMessage(protocol.SendMessage, line)
 	}

@@ -15,6 +15,7 @@ const (
 	Ping
 	Die
 	ListUsers
+	KickUser
 )
 
 type Message struct {
