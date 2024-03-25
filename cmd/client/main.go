@@ -6,11 +6,14 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
+	"github.com/NicolasLopes7/tcp-chat/cli"
+	"github.com/NicolasLopes7/tcp-chat/network"
 	"github.com/NicolasLopes7/tcp-chat/protocol"
+	"github.com/NicolasLopes7/tcp-chat/services"
+	"github.com/NicolasLopes7/tcp-chat/state"
 )
 
 func main() {
@@ -25,80 +28,34 @@ func main() {
 		return
 	}
 
-	go func() {
-		t := time.NewTicker(1 * time.Second)
-		defer t.Stop()
-
-		for range t.C {
-			err := checkServerStatus(&conn)
-			if err != nil {
-				fmt.Print("\n\nServer is down\n")
-				cancel(&conn, signalChan)
-			}
-		}
-	}()
-
-	go func() {
-		for {
-			message, err := protocol.ReadMessage(&conn)
-			if err != nil {
-				fmt.Println("Error reading message:", err)
-				return
-			}
-			if message.Type == protocol.Die {
-				fmt.Println(message.Payload)
-				cancel(&conn, signalChan)
-				return
-			}
-		}
-	}()
-
-	fmt.Println("Enter your name: ")
-	scanner.Scan()
-	name := scanner.Text()
-
-	_, err = conn.Write(protocol.NewMessage(protocol.SetName, name).ToBytes())
-	if err != nil {
-		fmt.Println("Error: ", err)
-		return
+	roomService := &services.RoomService{
+		Rooms: []*state.Room{},
+		Conn:  &conn,
 	}
 
-	inputChan := make(chan string)
-
-	go func() {
-		fmt.Printf("%s >: ", time.Now().Format(time.Kitchen))
-		for scanner.Scan() {
-			fmt.Printf("%s >: ", time.Now().Format(time.Kitchen))
-			inputChan <- scanner.Text()
-		}
-	}()
-
-	for {
-		select {
-		case <-signalChan:
-			cancel(&conn, signalChan)
-		case line := <-inputChan:
-			_, err = conn.Write(GetCommandOrMessage(line).ToBytes())
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-		}
+	userService := &services.UserService{
+		User: &state.User{Conn: &conn},
 	}
-}
 
-func GetCommandOrMessage(line string) *protocol.Message {
-	parts := strings.Split(line, " ")
-	command := parts[0]
-
-	switch command {
-	case "/list":
-		return protocol.NewMessage(protocol.ListUsers, "")
-	case "/kick":
-		return protocol.NewMessage(protocol.KickUser, parts[1])
-	default:
-		return protocol.NewMessage(protocol.SendMessage, line)
+	writerService := &network.WriterService{
+		Conn: &conn,
 	}
+
+	stdinConsumer := &services.StdinConsumer{
+		WriterService: writerService,
+	}
+
+	cli.Render(&cli.RendererContainer{
+		RoomService:   roomService,
+		UserService:   userService,
+		Scanner:       scanner,
+		StdinConsumer: stdinConsumer,
+	})
+
+	go withHealthCheck(&conn, signalChan)
+	go withDuplexConn(&conn, signalChan)
+	go WithSignals(&conn, signalChan)
+
 }
 
 func cancel(conn *net.Conn, signalChan chan os.Signal) {
@@ -108,6 +65,32 @@ func cancel(conn *net.Conn, signalChan chan os.Signal) {
 	os.Exit(0)
 }
 
+func withDuplexConn(conn *net.Conn, c chan os.Signal) {
+	for {
+		message, err := protocol.ReadMessage(conn)
+		if err != nil {
+			fmt.Println("Error reading message:", err)
+			return
+		}
+		fmt.Println(message.Payload)
+		if message.Type == protocol.Die {
+			cancel(conn, c)
+			return
+		}
+	}
+}
+func withHealthCheck(conn *net.Conn, c chan os.Signal) {
+	t := time.NewTicker(1 * time.Second)
+	defer t.Stop()
+
+	for range t.C {
+		err := checkServerStatus(conn)
+		if err != nil {
+			fmt.Print("\n\nServer is down\n")
+			cancel(conn, c)
+		}
+	}
+}
 func checkServerStatus(conn *net.Conn) error {
 	_, err := (*conn).Write(protocol.NewMessage(protocol.Ping, "").ToBytes())
 	if err != nil {
@@ -115,4 +98,13 @@ func checkServerStatus(conn *net.Conn) error {
 	}
 
 	return nil
+}
+
+func WithSignals(conn *net.Conn, c chan os.Signal) {
+	for {
+		select {
+		case <-c:
+			cancel(conn, c)
+		}
+	}
 }
