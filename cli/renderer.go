@@ -8,39 +8,39 @@ import (
 )
 
 type RendererContainer struct {
-	roomService   services.AbstractRoomService
-	userService   services.AbstractUserService
-	stdinConsumer services.AbstractStdinConsumer
-	scanner       *bufio.Scanner
+	RoomService   services.AbstractRoomService
+	UserService   services.AbstractUserService
+	StdinConsumer services.AbstractStdinConsumer
+	Scanner       *bufio.Scanner
 }
 
 func NewPageRender(container *RendererContainer) func(name string) error {
 	return func(name string) error {
 		switch name {
 		case "get-name":
-			name, err := GetNameScreen(container.scanner)
+			name, err := GetNameScreen(container.Scanner)
 			if err != nil {
 				fmt.Println("Error: ", err)
 				return err
 			}
 
-			container.userService.SetName(*name)
+			container.UserService.SetName(*name)
 			return nil
 		case "select-room":
-			room, err := SelectRoomScreen(container.scanner, container.roomService.GetRooms(container.userService.GetName()))
+			room, err := SelectRoomScreen(container.Scanner, container.RoomService.GetRooms(container.UserService.GetName()))
 			if err != nil {
 				fmt.Println("Error: ", err)
 				return err
 			}
 
-			err = container.roomService.SubscribeToRoom(*room)
+			err = container.RoomService.SubscribeToRoom(*room)
 			if err != nil {
 				return err
 			}
 			return nil
 		case "chat":
-			inputChan := ChatScreen(container.scanner)
-			err := container.stdinConsumer.Parse(inputChan)
+			inputChan := ChatScreen(container.Scanner)
+			err := container.StdinConsumer.Parse(inputChan)
 
 			if err != nil {
 				fmt.Println("Error: ", err)
@@ -53,7 +53,7 @@ func NewPageRender(container *RendererContainer) func(name string) error {
 	}
 }
 
-func NewRenderer(container *RendererContainer) {
+func Render(container *RendererContainer) {
 	pages := []*Page{
 		{name: "get-name"},
 		{name: "select-room"},

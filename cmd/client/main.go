@@ -6,12 +6,14 @@ import (
 	"net"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/NicolasLopes7/tcp-chat/cli"
+	"github.com/NicolasLopes7/tcp-chat/network"
 	"github.com/NicolasLopes7/tcp-chat/protocol"
+	"github.com/NicolasLopes7/tcp-chat/services"
+	"github.com/NicolasLopes7/tcp-chat/state"
 )
 
 func main() {
@@ -26,58 +28,34 @@ func main() {
 		return
 	}
 
+	roomService := &services.RoomService{
+		Rooms: []*state.Room{},
+		Conn:  &conn,
+	}
+
+	userService := &services.UserService{
+		User: &state.User{Conn: &conn},
+	}
+
+	writerService := &network.WriterService{
+		Conn: &conn,
+	}
+
+	stdinConsumer := &services.StdinConsumer{
+		WriterService: writerService,
+	}
+
+	cli.Render(&cli.RendererContainer{
+		RoomService:   roomService,
+		UserService:   userService,
+		Scanner:       scanner,
+		StdinConsumer: stdinConsumer,
+	})
+
 	go withHealthCheck(&conn, signalChan)
 	go withDuplexConn(&conn, signalChan)
+	go WithSignals(&conn, signalChan)
 
-	name, err := cli.GetNameScreen(scanner)
-
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	_, err = conn.Write(protocol.NewMessage(protocol.SetName, *name).ToBytes())
-	if err != nil {
-		fmt.Println("Error: ", err)
-		return
-	}
-
-	inputChan := make(chan string)
-
-	go func() {
-		fmt.Printf("%s >: ", time.Now().Format(time.Kitchen))
-		for scanner.Scan() {
-			fmt.Printf("%s >: ", time.Now().Format(time.Kitchen))
-			inputChan <- scanner.Text()
-		}
-	}()
-
-	for {
-		select {
-		case <-signalChan:
-			cancel(&conn, signalChan)
-		case line := <-inputChan:
-			_, err = conn.Write(GetCommandOrMessage(line).ToBytes())
-			if err != nil {
-				fmt.Println(err)
-				return
-			}
-		}
-	}
-}
-
-func GetCommandOrMessage(line string) *protocol.Message {
-	parts := strings.Split(line, " ")
-	command := parts[0]
-
-	switch command {
-	case "/list":
-		return protocol.NewMessage(protocol.ListUsers, "")
-	case "/kick":
-		return protocol.NewMessage(protocol.KickUser, parts[1])
-	default:
-		return protocol.NewMessage(protocol.SendMessage, line)
-	}
 }
 
 func cancel(conn *net.Conn, signalChan chan os.Signal) {
@@ -120,4 +98,13 @@ func checkServerStatus(conn *net.Conn) error {
 	}
 
 	return nil
+}
+
+func WithSignals(conn *net.Conn, c chan os.Signal) {
+	for {
+		select {
+		case <-c:
+			cancel(conn, c)
+		}
+	}
 }

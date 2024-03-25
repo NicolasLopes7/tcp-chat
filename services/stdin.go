@@ -12,13 +12,15 @@ type AbstractStdinConsumer interface {
 	Parse(inputChan chan string) error
 }
 
-type StdinConsumer struct{}
+type StdinConsumer struct {
+	WriterService network.AbstractWriter
+}
 
-func (sc *StdinConsumer) Parse(inputChan chan string, writer network.AbstractWriter) error {
+func (sc *StdinConsumer) Parse(inputChan chan string) error {
 	for {
 		select {
 		case line := <-inputChan:
-			err := writer.Write(GetCommandOrMessage(line))
+			err := sc.WriterService.Write(GetCommandOrMessage(line))
 			if err != nil {
 				fmt.Println("Error: ", err)
 				return err

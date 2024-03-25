@@ -14,13 +14,13 @@ type AbstractRoomService interface {
 }
 
 type RoomService struct {
-	rooms []*state.Room
-	conn  *net.Conn
+	Rooms []*state.Room
+	Conn  *net.Conn
 }
 
 func (rs *RoomService) GetRooms(userName string) []*state.Room {
 	var result []*state.Room
-	for _, room := range rs.rooms {
+	for _, room := range rs.Rooms {
 		if room.Acl == nil {
 			continue
 		}
@@ -41,7 +41,7 @@ func (rs *RoomService) GetRooms(userName string) []*state.Room {
 }
 
 func (rs *RoomService) SubscribeToRoom(room string) error {
-	_, err := (*rs.conn).Write(protocol.NewMessage(protocol.SubscribeToRoom, room).ToBytes())
+	_, err := (*rs.Conn).Write(protocol.NewMessage(protocol.SubscribeToRoom, room).ToBytes())
 
 	if err != nil {
 		return err
@@ -51,7 +51,7 @@ func (rs *RoomService) SubscribeToRoom(room string) error {
 }
 
 func (rs *RoomService) UnsubscribeToRoom(room string) error {
-	_, err := (*rs.conn).Write(protocol.NewMessage(protocol.UnsubscribeToRoom, room).ToBytes())
+	_, err := (*rs.Conn).Write(protocol.NewMessage(protocol.UnsubscribeToRoom, room).ToBytes())
 
 	if err != nil {
 		return err

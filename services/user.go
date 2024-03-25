@@ -13,17 +13,17 @@ type AbstractUserService interface {
 }
 
 type UserService struct {
-	user *state.User
+	User *state.User
 }
 
 func (us *UserService) SetName(name string) {
-	us.user.Name = name
+	us.User.Name = name
 }
 
 func (us *UserService) SetConn(conn *net.Conn) {
-	us.user.Conn = conn
+	us.User.Conn = conn
 }
 
 func (us *UserService) GetName() string {
-	return us.user.Name
+	return us.User.Name
 }

@@ -12,12 +12,12 @@ type AbstractWriter interface {
 }
 
 type WriterService struct {
-	conn *net.Conn
+	Conn *net.Conn
 }
 
 func (ws *WriterService) Write(message *protocol.Message) error {
 
-	_, err := (*ws.conn).Write(message.ToBytes())
+	_, err := (*ws.Conn).Write(message.ToBytes())
 
 	if err != nil {
 		fmt.Println("Error: ", err)
